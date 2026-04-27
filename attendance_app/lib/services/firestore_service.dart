@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/attendance_model.dart';
 import '../models/user_model.dart';
+import 'local_database_service.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -114,8 +115,11 @@ class FirestoreService {
 
   // === SESSION CRUD ===
   Future<void> createSession(Map<String, dynamic> sessionData) async {
+    // Simpan ke Firestore
     await _db.collection('sessions').add(sessionData);
-  }
+    // Sync ke SQLite
+    await LocalDatabaseService().insertSession(sessionData);
+  } 
 
   Future<Map<String, dynamic>?> getSession(String sessionId) async {
     final snap = await _db
@@ -136,6 +140,16 @@ class FirestoreService {
   }
 
   Future<void> deleteSession(String id) async {
+    // Ambil sessionId dulu sebelum dihapus
+    final doc = await _db.collection('sessions').doc(id).get();
+    final sessionId = doc.data()?['sessionId'] as String?;
+
+    // Hapus dari Firestore
     await _db.collection('sessions').doc(id).delete();
+
+    // Hapus dari SQLite
+    if (sessionId != null) {
+      await LocalDatabaseService().deleteSession(sessionId);
+    }
   }
 }

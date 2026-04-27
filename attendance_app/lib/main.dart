@@ -6,6 +6,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/admin/admin_screen.dart';
 import 'services/auth_service.dart';
+import 'services/local_database_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -13,10 +14,14 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Seed admin account
+  
+  // Inisialisasi SQLite
+  await LocalDatabaseService().database;
+  
+  // Seed admin
   await AuthService().seedAdminIfNotExists();
 
+  // Init notifications
   const AndroidInitializationSettings androidSettings =
       AndroidInitializationSettings('@mipmap/ic_launcher');
   const InitializationSettings initSettings =

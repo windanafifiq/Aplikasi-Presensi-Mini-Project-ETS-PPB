@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:gap/gap.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/firestore_service.dart';
 import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
 import '../../models/attendance_model.dart';
 import '../../models/user_model.dart';
+import '../../services/local_database_service.dart';
+
 
 class ScanScreen extends StatefulWidget {
   final UserModel userModel;
@@ -88,7 +91,8 @@ class _ScanScreenState extends State<ScanScreen> {
         return;
       }
 
-      final alreadyAttended = await _firestoreService.hasAttendedSession(widget.userModel.uid, sessionId);
+      final alreadyAttended = await _firestoreService.hasAttendedSession(
+          widget.userModel.uid, sessionId);
       if (alreadyAttended) { _showResult(false, 'Kamu sudah check in di sesi ini'); return; }
 
       final attendance = AttendanceModel(
@@ -102,8 +106,44 @@ class _ScanScreenState extends State<ScanScreen> {
         longitude: position.longitude,
         status: 'checked_in',
       );
-      await _firestoreService.addAttendance(attendance);
-      await _notificationService.showAttendanceSuccess(widget.userModel.name, sessionId);
+
+      // Simpan ke Firestore
+      final docRef = await FirebaseFirestore.instance
+          .collection('attendance')
+          .add(attendance.toMap());
+
+      // Pastikan user ada di SQLite dulu
+      await LocalDatabaseService().insertUser({
+        'uid': widget.userModel.uid,
+        'name': widget.userModel.name,
+        'nrp': widget.userModel.nrp,
+        'department': widget.userModel.department,
+        'role': widget.userModel.role,
+        'createdAt': DateTime.now().toString(),
+      });
+
+      // Pastikan session ada di SQLite dulu
+      await LocalDatabaseService().insertSession({
+        'sessionId': sessionId,
+        'startTime': startTime,
+        'endTime': endTime,
+        'createdAt': DateTime.now(),
+      });
+
+      // Baru insert attendance ke SQLite
+      await LocalDatabaseService().insertAttendance({
+        'attendanceId': docRef.id,
+        'userId': widget.userModel.uid,
+        'userName': widget.userModel.name,
+        'nrp': widget.userModel.nrp,
+        'sessionId': sessionId,
+        'checkInTime': attendance.checkInTime.toString(),
+        'checkOutTime': null,
+        'status': attendance.status,
+      });
+
+      await _notificationService.showAttendanceSuccess(
+          widget.userModel.name, sessionId);
       _showResult(true, 'Check in berhasil!\nSesi: $sessionId');
     } catch (e) {
       _showResult(false, 'Error: $e');

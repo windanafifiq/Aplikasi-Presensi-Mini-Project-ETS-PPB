@@ -7,6 +7,7 @@ import '../models/attendance_model.dart';
 import 'attendance/scan_screen.dart';
 import 'attendance/history_screen.dart';
 import 'profile_screen.dart';
+import '../services/local_database_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel userModel;
@@ -25,7 +26,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _checkActiveAttendance();
+    _syncAndLoad();
+  }
+
+  Future<void> _syncAndLoad() async {
+    // Sync sesi dari Firestore ke SQLite
+    final sessions = await _firestoreService.getAllSessions().first;
+    await LocalDatabaseService().syncSessions(sessions);
+    // Cek active attendance
+    await _checkActiveAttendance();
   }
 
   Future<void> _checkActiveAttendance() async {
